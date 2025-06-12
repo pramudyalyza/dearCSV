@@ -1,0 +1,95 @@
+sequenceDiagram
+    participant User
+    participant Streamlit as Streamlit App
+    participant Pandas as Pandas
+    participant SQLite as SQLite DB
+    participant Gemini as Google Gemini AI
+    participant Tools as Query Tools
+
+    Note over User, Tools: Application Initialization
+    User->>Streamlit: Launch app
+    Streamlit->>Streamlit: setup() - Configure UI & styling
+    Streamlit->>User: Display "Dear CSV" interface
+
+    Note over User, Tools: File Upload & Processing
+    User->>Streamlit: Upload CSV file
+    Streamlit->>Pandas: pd.read_csv() with delimiter detection
+    alt CSV parsing successful
+        Pandas-->>Streamlit: Return DataFrame
+        Streamlit->>Streamlit: create_schema_string()
+        Streamlit->>SQLite: Create in-memory DB & load data
+        SQLite-->>Streamlit: Confirm data loaded
+        Streamlit->>User: Show data preview (first 5 rows)
+    else CSV parsing failed
+        Pandas-->>Streamlit: Parser error
+        Streamlit->>User: Display error message
+    end
+
+    Note over User, Tools: Context & Suggestions Generation
+    User->>Streamlit: Enter dataset context (optional)
+    Streamlit->>Gemini: generate_prompt_suggestions(schema, context)
+    Gemini-->>Streamlit: Return 3 suggested questions
+    Streamlit->>User: Display suggested questions as buttons
+
+    Note over User, Tools: Query Processing Flow
+    alt User clicks suggestion
+        User->>Streamlit: Click suggested question
+        Streamlit->>Streamlit: Set suggestion as prompt
+    else User types custom query
+        User->>Streamlit: Enter custom question in chat
+    end
+
+    Streamlit->>Streamlit: Add user message to conversation history
+    Streamlit->>Gemini: Initialize chat session with system instruction
+    Streamlit->>Gemini: send_message(user_question)
+
+    Note over Gemini, Tools: AI Processing & SQL Generation
+    Gemini->>Gemini: Analyze question & generate SQL query
+    Gemini->>Tools: execute_query_tool(sql_query)
+    Tools->>SQLite: Execute SQL query
+    
+    alt Query successful
+        SQLite-->>Tools: Return query results
+        Tools->>Tools: Convert results to JSON
+        Tools-->>Gemini: Return query results
+        Gemini-->>Streamlit: Return response with function call results
+    else Query failed
+        SQLite-->>Tools: Return SQL error
+        Tools-->>Gemini: Return error message
+        Gemini-->>Streamlit: Return error response
+    end
+
+    Note over User, Tools: Results Display & Explanation
+    alt Successful query execution
+        Streamlit->>Streamlit: format_sql() - Format query for display
+        Streamlit->>User: Display formatted SQL query
+        Streamlit->>Pandas: Convert results to DataFrame
+        Streamlit->>User: Display results table
+        
+        Streamlit->>Gemini: generate_explanation(question, query, results)
+        Gemini-->>Streamlit: Return natural language explanation
+        Streamlit->>User: Display explanation
+        
+        Streamlit->>Streamlit: Add complete interaction to conversation history
+    else Query execution failed
+        Streamlit->>User: Display error message
+        Streamlit->>Streamlit: Add error to conversation history
+    end
+
+    Note over User, Tools: Conversation Loop
+    loop Continued Interaction
+        User->>Streamlit: Ask another question
+        Note over Streamlit, Gemini: Repeat Query Processing Flow
+        Streamlit->>User: Display results with full conversation history
+    end
+
+    Note over User, Tools: Session Management
+    alt New file uploaded
+        User->>Streamlit: Upload different CSV
+        Streamlit->>Streamlit: Reset all session states
+        Streamlit->>Streamlit: Clear conversation history
+        Note over Streamlit, SQLite: Restart from File Upload & Processing
+    else No file present
+        Streamlit->>Streamlit: Clear all session states
+        Streamlit->>User: Show "Please upload CSV" message
+    end
